@@ -1,0 +1,53 @@
+from pyspark.sql.types import (
+    BooleanType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+)
+
+
+GITHUB_EVENT_SCHEMA = StructType(
+    [
+        StructField(
+            "event_id",
+            StringType(),
+            True,
+        ),
+        StructField(
+            "event_type",
+            StringType(),
+            True,
+        ),
+        StructField(
+            "actor_id",
+            LongType(),
+            True,
+        ),
+        StructField(
+            "actor_login",
+            StringType(),
+            True,
+        ),
+        StructField(
+            "repo_id",
+            LongType(),
+            True,
+        ),
+        StructField(
+            "repo_name",
+            StringType(),
+            True,
+        ),
+        StructField(
+            "is_public",
+            BooleanType(),
+            True,
+        ),
+        StructField(
+            "created_at",
+            StringType(),
+            True,
+        ),
+    ]
+)

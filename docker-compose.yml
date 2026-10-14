@@ -1,0 +1,160 @@
+services:
+
+  kafka:
+
+    image: apache/kafka:4.1.0
+
+    container_name:
+      github_streaming_kafka
+
+    ports:
+      - "9092:9092"
+
+    environment:
+
+      KAFKA_NODE_ID: 1
+
+      KAFKA_PROCESS_ROLES: >
+        broker,controller
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: >
+        1@kafka:9093
+
+      KAFKA_LISTENERS: >
+        INTERNAL://0.0.0.0:29092,
+        CONTROLLER://0.0.0.0:9093,
+        EXTERNAL://0.0.0.0:9092
+
+      KAFKA_ADVERTISED_LISTENERS: >
+        INTERNAL://kafka:29092,
+        EXTERNAL://localhost:9092
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        INTERNAL:PLAINTEXT,
+        CONTROLLER:PLAINTEXT,
+        EXTERNAL:PLAINTEXT
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: >
+        INTERNAL
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: >
+        CONTROLLER
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      KAFKA_NUM_PARTITIONS: 3
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+
+  postgres:
+
+    image: postgres:16
+
+    container_name:
+      github_streaming_postgres
+
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    environment:
+
+      POSTGRES_DB:
+        ${POSTGRES_DB}
+
+      POSTGRES_USER:
+        ${POSTGRES_USER}
+
+      POSTGRES_PASSWORD:
+        ${POSTGRES_PASSWORD}
+
+      TZ: UTC
+
+    volumes:
+
+      - postgres_data:/var/lib/postgresql/data
+
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+
+    healthcheck:
+
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  spark:
+
+    build:
+      context: .
+      dockerfile: spark/Dockerfile
+
+    container_name:
+      github_streaming_spark
+
+    depends_on:
+
+      postgres:
+        condition: service_healthy
+
+      kafka:
+        condition: service_started
+
+    environment:
+
+      SPARK_NO_DAEMONIZE: "true"
+
+      KAFKA_BOOTSTRAP_SERVERS: >
+        kafka:29092
+
+      KAFKA_TOPIC:
+        ${KAFKA_TOPIC}
+
+      KAFKA_DLQ_TOPIC:
+        ${KAFKA_DLQ_TOPIC}
+
+      POSTGRES_HOST:
+        postgres
+
+      POSTGRES_PORT:
+        5432
+
+      POSTGRES_DB:
+        ${POSTGRES_DB}
+
+      POSTGRES_USER:
+        ${POSTGRES_USER}
+
+      POSTGRES_PASSWORD:
+        ${POSTGRES_PASSWORD}
+
+    volumes:
+
+      - ./spark:/opt/spark/work-dir/spark
+
+      - ./checkpoints:/opt/spark/work-dir/checkpoints
+
+    command:
+      - /bin/bash
+      - -c
+      - tail -f /dev/null
+
+
+volumes:
+
+  kafka_data:
+
+  postgres_data:
